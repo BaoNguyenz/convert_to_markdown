@@ -13,6 +13,7 @@ env.bak/
 venv.bak/
 
 # App generated files
+/images/
 app/images/
 *.md
 
@@ -20,7 +21,3 @@ app/images/
 .vscode/
 .idea/
 .DS_Store
-
-
-/images/*
-*__pycache__
