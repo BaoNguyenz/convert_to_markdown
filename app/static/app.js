@@ -4,6 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let conversionStartTime = 0;
     let timerInterval = null;
     let convertedMarkdown = "";
+    let currentSessionId = "";
 
     // DOM Elements
     const dropZone = document.getElementById("drop-zone");
@@ -163,6 +164,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 setStepState("step-markdown", "done");
                 
                 convertedMarkdown = result.markdown;
+                currentSessionId = result.metadata.session_id || "";
                 
                 // Display markdown
                 previewDisplay.innerHTML = marked.parse(result.markdown);
@@ -286,7 +288,15 @@ document.addEventListener("DOMContentLoaded", () => {
             showNotification("No converted content to download.", "error");
             return;
         }
+
+        // If images were generated, download the ZIP archive
+        if (currentSessionId) {
+            showNotification("Downloading ZIP archive with images...", "success");
+            window.location.href = `/api/download/zip/${currentSessionId}`;
+            return;
+        }
         
+        // Otherwise, download just the markdown text
         const blob = new Blob([convertedMarkdown], { type: "text/markdown;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
         

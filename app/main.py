@@ -1,11 +1,15 @@
 import os
+import uuid
 import shutil
 import tempfile
 import logging
+import zipfile
+import io
+from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, HttpUrl
 
 from app.converter import DoclingConverter
@@ -35,8 +39,16 @@ class URLConversionRequest(BaseModel):
     enable_ocr: bool = True
     generate_images: bool = False
 
-# Ensure temp directory exists
+# Temp dir for uploaded files
 TEMP_DIR = tempfile.gettempdir()
+
+# Persistent folder where extracted images are stored and served
+# Each conversion gets its own sub-folder named by a short UUID
+IMAGES_DIR = Path(os.path.dirname(__file__)) / "images"
+IMAGES_DIR.mkdir(exist_ok=True)
+
+# Public base URL for the images static mount
+IMAGES_BASE_URL = "http://127.0.0.1:8000/images"
 
 # API Endpoints
 @app.get("/api/health")
@@ -66,9 +78,16 @@ async def convert_file(
             
     # Process conversion
     try:
+        # Create a session-specific sub-folder so multiple conversions don't collide
+        session_id = uuid.uuid4().hex[:8] if generate_images else ""
+
         converter = DoclingConverter(enable_ocr=enable_ocr, generate_images=generate_images)
-        result = converter.convert_document(temp_path)
-        
+        result = converter.convert_document(
+            temp_path,
+            session_id=session_id,
+            images_base_url=IMAGES_BASE_URL,
+        )
+
         # Clean up temp file
         os.unlink(temp_path)
         
@@ -93,8 +112,15 @@ async def convert_url(request: URLConversionRequest):
     logger.info(f"Received URL conversion request: {request.url}")
     
     try:
+        # Create a session-specific sub-folder so multiple conversions don't collide
+        session_id = uuid.uuid4().hex[:8] if request.generate_images else ""
+
         converter = DoclingConverter(enable_ocr=request.enable_ocr, generate_images=request.generate_images)
-        result = converter.convert_document(request.url)
+        result = converter.convert_document(
+            request.url,
+            session_id=session_id,
+            images_base_url=IMAGES_BASE_URL,
+        )
         
         if result["success"]:
             return result
@@ -105,8 +131,34 @@ async def convert_url(request: URLConversionRequest):
         logger.error(f"Unexpected error in URL conversion endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/download/zip/{session_id}")
+async def download_zip(session_id: str):
+    """
+    Returns a ZIP file containing the markdown and the extracted images folder.
+    """
+    session_dir = IMAGES_DIR / session_id
+    if not session_dir.exists():
+        raise HTTPException(status_code=404, detail="Session not found or expired.")
+        
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for file_path in session_dir.glob("**/*"):
+            if file_path.is_file():
+                # Add file to zip using relative path so the structure is preserved
+                arcname = file_path.relative_to(session_dir)
+                zip_file.write(file_path, arcname)
+                
+    zip_buffer.seek(0)
+    return StreamingResponse(
+        zip_buffer, 
+        media_type="application/zip", 
+        headers={"Content-Disposition": f"attachment; filename=markdown_with_images.zip"}
+    )
+
+# Serve extracted images as static files at /images
+app.mount("/images", StaticFiles(directory=str(IMAGES_DIR)), name="images")
+
 # Mount frontend static files
-# Make sure to check if directory exists first
 static_path = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_path):
     app.mount("/", StaticFiles(directory=static_path, html=True), name="static")
