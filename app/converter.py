@@ -1,6 +1,12 @@
 import time
 import logging
 from typing import Dict, Any, Optional
+
+try:
+    import torch
+    _TORCH_AVAILABLE = True
+except ImportError:
+    _TORCH_AVAILABLE = False
 from docling.document_converter import DocumentConverter
 from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling.datamodel.base_models import InputFormat
@@ -19,10 +25,29 @@ class DoclingConverter:
         self.generate_images = generate_images
         self.converter = self._init_converter()
 
+    def _log_gpu_status(self):
+        """
+        Logs GPU/CUDA availability and device information.
+        """
+        if _TORCH_AVAILABLE:
+            if torch.cuda.is_available():
+                device_count = torch.cuda.device_count()
+                device_name = torch.cuda.get_device_name(0)
+                torch_version = torch.__version__
+                logger.info(f"✅ CUDA is available — PyTorch {torch_version}")
+                logger.info(f"   GPU count : {device_count}")
+                logger.info(f"   GPU 0     : {device_name}")
+            else:
+                logger.warning("⚠️  CUDA is NOT available — Docling will run on CPU (slower).")
+                logger.warning("    Install a CUDA-enabled PyTorch build to use your GPU.")
+        else:
+            logger.warning("⚠️  PyTorch is not installed — cannot determine GPU status.")
+
     def _init_converter(self) -> DocumentConverter:
         """
         Initializes the DocumentConverter with customized pipeline options.
         """
+        self._log_gpu_status()
         logger.info("Initializing Docling DocumentConverter...")
         
         # Define pipeline options for PDFs
