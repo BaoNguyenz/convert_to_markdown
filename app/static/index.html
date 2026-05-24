@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docling Markdown Studio</title>
+    <!-- Google Fonts: Outfit and Fira Code -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="app.css">
+</head>
+<body>
+    <div class="glass-bg"></div>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo-area">
+                <div class="logo-icon"></div>
+                <h1>Docling <span>Markdown Studio</span></h1>
+            </div>
+            <div class="header-status">
+                <span class="status-indicator online"></span>
+                <span class="status-text">Server Active</span>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="workspace">
+            <!-- Left Panel: Upload and Settings -->
+            <section class="panel control-panel">
+                <div class="panel-header">
+                    <h2>Input Source</h2>
+                    <p class="panel-subtitle">Upload a local file or fetch from a URL</p>
+                </div>
+
+                <!-- Input Tabs -->
+                <div class="tabs input-tabs">
+                    <button class="tab-btn active" data-tab="upload-tab">Local File</button>
+                    <button class="tab-btn" data-tab="url-tab">Remote URL</button>
+                </div>
+
+                <!-- Tab Contents -->
+                <div class="tab-content active" id="upload-tab">
+                    <div class="drag-drop-zone" id="drop-zone">
+                        <input type="file" id="file-input" class="hidden-input" accept=".pdf,.docx,.pptx,.xlsx,.html,.jpg,.jpeg,.png">
+                        <div class="upload-icon"></div>
+                        <div class="upload-text">
+                            <span class="highlight">Drag & Drop files here</span> or click to browse
+                        </div>
+                        <p class="upload-limit">Supports PDF, DOCX, PPTX, XLSX, HTML, Images</p>
+                        <div class="selected-file-info hidden" id="file-info">
+                            <span class="file-name">document.pdf</span>
+                            <button class="remove-file-btn" id="remove-file-btn">&times;</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="url-tab">
+                    <div class="url-input-container">
+                        <input type="url" id="url-input" placeholder="https://example.com/document.pdf" class="sleek-input">
+                        <p class="input-tip">Ensure this link points directly to a document file or HTML page.</p>
+                    </div>
+                </div>
+
+                <!-- Conversion Options -->
+                <div class="options-container">
+                    <h3>Conversion Options</h3>
+                    <div class="option-row">
+                        <div class="option-info">
+                            <label for="ocr-toggle">Run OCR Pipeline</label>
+                            <span class="option-desc">Perform Optical Character Recognition on scanned PDFs and images.</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="ocr-toggle" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+
+                    <div class="option-row">
+                        <div class="option-info">
+                            <label for="images-toggle">Extract Inline Images</label>
+                            <span class="option-desc">Extract and include pictures found inside the document (PDF only).</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="images-toggle">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Action Button -->
+                <button class="action-btn" id="convert-btn">Convert to Markdown</button>
+
+                <!-- Processing Overlay/Status -->
+                <div class="processing-container hidden" id="processing-container">
+                    <div class="spinner"></div>
+                    <div class="progress-details">
+                        <h4>Converting Document...</h4>
+                        <div class="progress-steps">
+                            <span class="step-badge done">1. Uploading</span>
+                            <span class="step-badge active" id="step-ocr">2. OCR & Layout</span>
+                            <span class="step-badge" id="step-markdown">3. Markdown Formatting</span>
+                        </div>
+                        <div class="timer">Elapsed: <span id="elapsed-time">0.0</span>s</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Panel: Output & Rendering -->
+            <section class="panel output-panel">
+                <div class="panel-header-flex">
+                    <div class="panel-header">
+                        <h2>Markdown Output</h2>
+                        <p class="panel-subtitle">Preview and export your converted document</p>
+                    </div>
+                    <div class="output-actions">
+                        <button class="icon-btn" id="copy-btn" title="Copy Markdown to Clipboard">
+                            <span class="icon copy-icon"></span> Copy
+                        </button>
+                        <button class="icon-btn" id="download-btn" title="Download Markdown File">
+                            <span class="icon download-icon"></span> Download
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Metrics bar -->
+                <div class="metrics-bar hidden" id="metrics-bar">
+                    <div class="metric-item">
+                        <span class="metric-label">Pages</span>
+                        <span class="metric-value" id="metric-pages">-</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Speed</span>
+                        <span class="metric-value" id="metric-speed">-</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Title</span>
+                        <span class="metric-value truncate" id="metric-title">-</span>
+                    </div>
+                </div>
+
+                <!-- Output Tabs -->
+                <div class="tabs output-tabs">
+                    <button class="tab-btn active" data-tab="preview-tab">Visual Preview</button>
+                    <button class="tab-btn" data-tab="code-tab">Raw Markdown</button>
+                </div>
+
+                <!-- Output Display Area -->
+                <div class="output-content-container">
+                    <div class="output-pane active" id="preview-tab">
+                        <div class="rendered-markdown markdown-body" id="preview-display">
+                            <div class="placeholder-msg">
+                                <div class="placeholder-graphic"></div>
+                                <p>Upload a document and click convert to see the interactive visual preview here.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="output-pane" id="code-tab">
+                        <div class="code-viewer-container">
+                            <pre><code id="code-display" class="language-markdown"># Your document will appear here...</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Notification system -->
+    <div class="notifications-container" id="notifications"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
