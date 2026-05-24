@@ -8,7 +8,7 @@ try:
 except ImportError:
     _TORCH_AVAILABLE = False
 from docling.document_converter import DocumentConverter
-from docling.datamodel.pipeline_options import PdfPipelineOptions
+from docling.datamodel.pipeline_options import PdfPipelineOptions, AcceleratorOptions, AcceleratorDevice
 from docling.datamodel.base_models import InputFormat
 
 # Setup logging
@@ -20,9 +20,10 @@ class DoclingConverter:
     Wrapper around IBM's Docling DocumentConverter to provide options,
     logging, and detailed metrics.
     """
-    def __init__(self, enable_ocr: bool = True, generate_images: bool = False):
+    def __init__(self, enable_ocr: bool = True, generate_images: bool = False, images_scale: float = 1.5):
         self.enable_ocr = enable_ocr
         self.generate_images = generate_images
+        self.images_scale = images_scale  # Lower = less RAM, default docling is 2.0
         self.converter = self._init_converter()
 
     def _log_gpu_status(self):
@@ -52,18 +53,35 @@ class DoclingConverter:
         
         # Define pipeline options for PDFs
         pipeline_options = PdfPipelineOptions()
-        
+
         # Toggle OCR based on parameters
         pipeline_options.do_ocr = self.enable_ocr
-        
+
         # Setup image generation options
         pipeline_options.generate_page_images = self.generate_images
         pipeline_options.generate_picture_images = self.generate_images
-        
+
+        # Rendering scale for PDF pages (lower = less RAM usage, default is 2.0)
+        # 1.5 = good quality, ~44% less RAM than default — fixes std::bad_alloc on large docs
+        pipeline_options.images_scale = self.images_scale
+        logger.info(f"📄 PDF render scale: {self.images_scale}x (lower = less RAM, default=2.0)")
+
+        # Explicit GPU acceleration — use CUDA if available, fall back to CPU
+        if _TORCH_AVAILABLE and torch.cuda.is_available():
+            pipeline_options.accelerator_options = AcceleratorOptions(
+                num_threads=4,
+                device=AcceleratorDevice.CUDA
+            )
+            logger.info("🚀 Docling accelerator set to: CUDA (GPU)")
+        else:
+            pipeline_options.accelerator_options = AcceleratorOptions(
+                num_threads=4,
+                device=AcceleratorDevice.CPU
+            )
+            logger.info("🐢 Docling accelerator set to: CPU")
+
         # Create the converter with configured options
-        converter = DocumentConverter(
-            # We can optionally specify custom pipeline options here
-        )
+        converter = DocumentConverter()
         return converter
 
     def convert_document(self, source: str) -> Dict[str, Any]:
