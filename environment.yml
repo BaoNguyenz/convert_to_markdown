@@ -1,0 +1,12 @@
+name: docling-env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - docling
+      - fastapi
+      - uvicorn
+      - python-multipart
